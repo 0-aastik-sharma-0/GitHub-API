@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Repositories Viewer</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        #reposList {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .repoItem {
+            margin-bottom: 10px;
+            margin-top: 50px;
+            border: 2px solid black;
+            padding: 10px;
+            width: 45%;
+            margin-right: 5%;
+        }
+
+        #pagination {
+            margin-top: 20px;
+        }
+
+        .rowContainer {
+            display: flex;
+            margin-bottom: 20px;
+            margin-left: 10%;
+            margin-right: 5%;
+        }
+
+        .languageSection {
+            border-radius: 10px;
+            background-color: rgb(1, 144, 192);
+            padding: 5px;
+            margin-top: 10px;
+            width: fit-content;
+            color: white;
+        }
+
+        .userNameClass {
+            color: rgb(1, 144, 192);
+        }
+
+        .userInfoContainer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .userDetailsContainer {
+            padding: 20px;
+            display: flex;
+            align-items: center;
+        }
+
+        .userImageContainer {
+            border: solid;
+            border-color: whitesmoke;
+            border-radius: 50%;
+            overflow: hidden;
+            width: 150px;
+            height: 150px;
+            margin-right: 50px;
+        }
+
+        .userImage {
+            width: 100%;
+            height: auto;
+        }
+
+        .userDetails {
+            flex: 1;
+        }
+
+        .bottomButtonPaginationClass {
+            margin-top: 25px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .paginationClass {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .prevOldButtonStyle {
+            border-radius: 25px;
+            padding: 5px 10px;
+            border-color: #0000000f;
+            background-color: white;
+            color: deepSkyBlue;
+        }
+
+        .numberButtons,
+        .nonNumberButtons {
+            background-color: white;
+            border-color: #0000000f;
+            color: deepSkyBlue;
+            padding: 5px 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>GitHub Repositories</h1>
+    <div class="input-group mb-3">
+        <input type="text" class="form-control" id="username" placeholder="Enter GitHub Username">
+        <button class="btn btn-primary" onclick="getRepositories()">Get Repositories</button>
+    </div>
+
+    <div id="userDetailsContainer" class="userInfoContainer"></div><br />
+    <ul id="reposList"></ul> <br />
+
+    <div class="paginationClass">
+        <div id="pagination"></div>
+    </div>
+
+    <script>
+        let currentPage = 1; // Initialize page counter
+        let totalRepos = 0;
+        let disablePrevious = true;
+        let disableNext = false;
+        let totalPages = 0;
+        const perPage = 6; // Adjust as needed
+        let lastIndex = -1;
+
+        async function getRepositories(event) {
+            if (event?.target?.index) {
+                lastIndex = event.target.index;
+            }
+
+            if (event?.target?.name) {
+                switch (event.target.name) {
+                    case 'Next':
+                        currentPage += 1;
+                        break;
+                    case 'Previous':
+                        currentPage -= 1;
+                        break;
+                    case 'Initial':
+                        currentPage = 1;
+                        break;
+                    case 'Last':
+                        currentPage = totalPages;
+                        break;
+                    default:
+                        currentPage = parseInt(event.target.name);
+                        break;
+                }
+            }
+
+            const username = document.getElementById('username').value;
+            const apiUrl = `https://api.github.com/users/${username}/repos?page=${currentPage}&per_page=${perPage}`;
+            const totalPageCalloutUrl = `https://api.github.com/users/${username}`;
+            const userDetails = `https://api.github.com/users/${username}`;
+
+            try {
+
+                await fetch(userDetails).then(response => response.json()).then(userData => {
+                    setUserDetails(userData);
+                });
+
+                const totalPageResponse = await fetch(totalPageCalloutUrl).then(response => response.json()).then(userData => {
+                    totalRepos = userData.public_repos
+                    totalPages = Math.ceil((parseInt(totalRepos) / perPage));
+                });
+
+                const response = await fetch(apiUrl);
+                const repositories = await response.json();
+
+                if (repositories.length > 0) {
+                    displayRepositories(repositories);
+
+                    if (event?.target?.name) {
+                        if (event.target.name === 'Previous' && (lastIndex == 1)) {
+                            createPaginationButton(currentPage, 'prev');
+                        } else if (event.target.name === 'Next' && (lastIndex == 9)) {
+                            createPaginationButton(currentPage - 1, 'next');
+                        } else if (event.target.name === 'Initial') {
+                            createPaginationButton(0, 'next');
+                        } else if (event.target.name === 'Last') {
+                            createPaginationButton(totalPages, 'prev');
+                        }
+                    } else {
+                        createPaginationButton();
+                    }
+
+                    setButtonVisibility();
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        function setButtonVisibility() {
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
+
+            if (currentPage === totalPages) {
+                nextButton.disabled = true;
+                prevButton.disabled = false;
+            } else if (currentPage === 1) {
+                prevButton.disabled = true;
+                nextButton.disabled = false;
+            } else {
+                nextButton.disabled = false;
+                prevButton.disabled = false;
+            }
+
+            [...document.getElementsByClassName('numberButtons')]?.forEach(button => {
+                button.style.backgroundColor = 'white';
+                button.style.color = 'deepSkyBlue';
+            });
+
+            const buttonTarget = document.getElementById(`${currentPage}`);
+            if (buttonTarget) {
+                buttonTarget.style.backgroundColor = 'deepSkyBlue';
+                buttonTarget.style.color = 'white';
+
+                if (buttonTarget.index) {
+                    lastIndex = buttonTarget.index;
+                }
+            }
+        }
+
+        function displayRepositories(repositories) {
+            const reposList = document.getElementById('reposList');
+            reposList.innerHTML = '';
+
+            repositories.forEach((repo, index) => {
+                // Create a row div for each pair of records
+                if (index % 2 === 0) {
+                    const rowContainer = document.createElement('div');
+                    rowContainer.className = 'rowContainer';
+                    reposList.appendChild(rowContainer);
+                }
+
+                // Get the last added row container
+                const rowContainers = reposList.getElementsByClassName('rowContainer');
+                const currentContainer = rowContainers[rowContainers.length - 1];
+
+                // Create a list item for each repository
+                const listItem = document.createElement('div');
+                listItem.className = 'col-md-6 repoItem'; // Bootstrap grid system for 2 columns
+                listItem.innerHTML = `
+                    <p class="userNameClass"><strong>${repo.name?.toUpperCase()}</strong></p><br/>
+                    ${repo.description || 'No description available.'}<br/><br/>
+                    <div class="languageSection">
+                        ${repo.language?.toUpperCase() || 'No Language specified'}
+                    </div>
+                `;
+
+                // Add the list item to the current row container
+                currentContainer.appendChild(listItem);
+            });
+        }
+
+
+        function setUserDetails(userData) {
+            if (userData) {
+                const userDetailsContainer = document.getElementById('userDetailsContainer');
+
+                if (userDetailsContainer) {
+                    userDetailsContainer.innerHTML = `
+                        <div class="userDetailsContainer">
+                            <div class="userImageContainer">
+                                <img src="${userData.avatar_url}" alt="User Avatar" class="userImage">
+                            </div>
+                            <div class="userDetails">
+                                <h2>${userData.name}</h2>
+                                <p><strong>Username:</strong> ${userData.login}</p>
+                                <p><strong>Location:</strong> ${userData.location || 'Not specified'}</p>
+                                <p><strong>Public Repositories:</strong> ${userData.public_repos}</p>
+                                <p><strong>Followers:</strong> ${userData.followers}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+
+        function createPaginationButton(startPage = 1, action = null) {
+            const paginationDiv = document.getElementById('pagination');
+            paginationDiv.innerHTML = '';
+
+            const initialPage = document.createElement('button');
+            initialPage.textContent = `<<`;
+            initialPage.id = 'initialButton';
+            initialPage.className = 'nonNumberButtons';
+            initialPage.onclick = getRepositories;
+            initialPage.name = `Initial`;
+            paginationDiv.appendChild(initialPage);
+
+            let start = 0;
+            let end = (totalPages > 9) ? 9 : totalPages;
+
+            if (action === 'next') {
+                start = startPage
+                end = start + 9;
+                if (start === totalPages || start + 1 === totalPages) {
+                    start = totalPages - 9;
+                    end = totalPages;
+                }
+            } else if (action === 'prev') {
+                start = startPage - 9;
+                if (start < 0) {
+                    start = 0;
+                }
+                end = start + 9;
+            }
+
+            if (start < 0) {
+                start = 0;
+                end = start + 9;
+            }
+
+            if (end > totalPages) {
+                end = totalPages;
+            }
+
+            let j = 0;
+            for (let i = start; i < end; i++) {
+                const numberButton = document.createElement('button');
+                numberButton.textContent = `${i + 1}`;
+                numberButton.id = `${i + 1}`;
+                numberButton.name = `${i + 1}`;
+                numberButton.index = `${++j}`;
+                numberButton.className = 'numberButtons';
+                numberButton.onclick = getRepositories;
+                numberButton.style = 'margin: 0';
+                paginationDiv.appendChild(numberButton);
+            }
+
+            const lastPage = document.createElement('button');
+            lastPage.textContent = `>>`;
+            lastPage.id = 'lastButton';
+            lastPage.className = 'nonNumberButtons';
+            lastPage.onclick = getRepositories;
+            lastPage.name = `Last`;
+            paginationDiv.appendChild(lastPage);
+
+            const paginationNavDiv = document.createElement('div');
+            paginationNavDiv.className = 'bottomButtonPaginationClass';
+
+            const previousButton = document.createElement('button');
+            previousButton.textContent = `<- Older`;
+            previousButton.className = 'prevOldButtonStyle';
+            previousButton.id = 'prevButton';
+            previousButton.onclick = getRepositories;
+            previousButton.name = `Previous`;
+            paginationNavDiv.appendChild(previousButton);
+
+            const nextButton = document.createElement('button');
+            nextButton.textContent = 'Newer ->';
+            nextButton.className = 'prevOldButtonStyle';
+            nextButton.name = 'Next';
+            nextButton.onclick = getRepositories;
+            nextButton.id = 'nextButton';
+            paginationNavDiv.appendChild(nextButton);
+
+            paginationDiv.appendChild(paginationNavDiv);
+
+
+            // Style Previous and Next buttons
+            previousButton.style.marginRight = '10px';
+            nextButton.style.marginLeft = '10px';
+        }
+
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</body>
+
+</html>
